@@ -1,0 +1,133 @@
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Player variables
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+player.CharacterAdded:Connect(function(newCharacter)
+	character = newCharacter
+	humanoid = newCharacter:WaitForChild("Humanoid")
+end)
+
+-- Configuration
+local NORMAL_SPEED = 16
+local SPRINT_SPEED = 28
+local MAX_STAMINA = 100
+local currentStamina = MAX_STAMINA
+
+local DRAIN_RATE = 20 -- Stamina lost per second while sprinting
+local REGEN_RATE = 15 -- Stamina gained per second while resting
+
+local isSprinting = false
+
+-- Colors
+local LIGHT_ORANGE = Color3.fromRGB(255, 150, 50)
+local DARK_ORANGE = Color3.fromRGB(180, 90, 20)
+local BACKGROUND_GRAY = Color3.fromRGB(40, 40, 40)
+
+-- Create UI Elements
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SprintGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- 1. Sprint Button (Basic Square)
+local sprintButton = Instance.new("TextButton")
+sprintButton.Name = "SprintButton"
+sprintButton.Size = UDim2.new(0, 120, 0, 60)
+sprintButton.Position = UDim2.new(0.85, 0, 0.75, 0) -- Positioned bottom-right area
+sprintButton.BackgroundColor3 = LIGHT_ORANGE
+sprintButton.BorderSizePixel = 0
+sprintButton.AutoButtonColor = true
+
+-- Stylish Rich Text
+sprintButton.RichText = true
+sprintButton.Text = "<b><font face='GothamBlack' color='#FFFFFF' size='22'>SPRINT</font></b>"
+sprintButton.Parent = screenGui
+
+-- UI Stroke for a clean edge
+local buttonStroke = Instance.new("UIStroke")
+buttonStroke.Thickness = 2
+buttonStroke.Color = Color3.fromRGB(255, 255, 255)
+buttonStroke.Parent = sprintButton
+
+-- 2. Stamina Bar Background (Placed right on top of the button)
+local staminaBg = Instance.new("Frame")
+staminaBg.Name = "StaminaBackground"
+staminaBg.Size = UDim2.new(1, 0, 0, 10) -- Same width as button, 10px high
+staminaBg.Position = UDim2.new(0, 0, 0, -15) -- 15 pixels above the button
+staminaBg.BackgroundColor3 = BACKGROUND_GRAY
+staminaBg.BorderSizePixel = 0
+staminaBg.Parent = sprintButton
+
+-- 3. Actual Stamina Fill Bar
+local staminaFill = Instance.new("Frame")
+staminaFill.Name = "StaminaFill"
+staminaFill.Size = UDim2.new(1, 0, 1, 0)
+staminaFill.BackgroundColor3 = LIGHT_ORANGE
+staminaFill.BorderSizePixel = 0
+staminaFill.Parent = staminaBg
+
+-- Logic Functions
+local function setSprinting(sprinting)
+	if sprinting and currentStamina > 0 and humanoid.MoveDirection.Magnitude > 0 then
+		isSprinting = true
+		humanoid.WalkSpeed = SPRINT_SPEED
+		sprintButton.BackgroundColor3 = DARK_ORANGE -- Visual feedback when pressed
+	else
+		isSprinting = false
+		humanoid.WalkSpeed = NORMAL_SPEED
+		sprintButton.BackgroundColor3 = LIGHT_ORANGE
+	end
+end
+
+-- Button Inputs (For Click / Mobile Tap)
+sprintButton.MouseButton1Down:Connect(function()
+	setSprinting(true)
+end)
+
+sprintButton.MouseButton1Up:Connect(function()
+	setSprinting(false)
+end)
+
+-- Keybind Backup (Shift Key for PC players)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.LeftShift then
+		setSprinting(true)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.LeftShift then
+		setSprinting(false)
+	end
+end)
+
+-- Core Loop for draining/generating stamina
+RunService.Heartbeat:Connect(function(deltaTime)
+	-- Force stop if player stops moving
+	if isSprinting and humanoid.MoveDirection.Magnitude == 0 then
+		setSprinting(false)
+	end
+
+	if isSprinting then
+		currentStamina = math.max(0, currentStamina - (DRAIN_RATE * deltaTime))
+		if currentStamina <= 0 then
+			setSprinting(false)
+		end
+	else
+		currentStamina = math.min(MAX_STAMINA, currentStamina + (REGEN_RATE * deltaTime))
+	end
+
+	-- Smoothly update the stamina bar size
+	local staminaRatio = currentStamina / MAX_STAMINA
+	TweenService:Create(staminaFill, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+		Size = UDim2.new(staminaRatio, 0, 1, 0)
+	}):Play()
+end)
