@@ -25,10 +25,11 @@ local REGEN_RATE = 15 -- Stamina gained per second while resting
 
 local isSprinting = false
 
--- Colors
-local LIGHT_ORANGE = Color3.fromRGB(255, 150, 50)
-local DARK_ORANGE = Color3.fromRGB(180, 90, 20)
-local BACKGROUND_GRAY = Color3.fromRGB(40, 40, 40)
+-- Colors matched to the reference image
+local LIGHT_ORANGE = Color3.fromRGB(243, 204, 144) -- The pastel cream/orange fill
+local BORDER_BROWN = Color3.fromRGB(139, 87, 42)    -- The thick brown outline
+local TEXT_DARK = Color3.fromRGB(20, 20, 20)        -- Soft black for the text
+local BG_DARK_ORANGE = Color3.fromRGB(186, 126, 68) -- Background fill for empty bar
 
 -- Create UI Elements
 local screenGui = Instance.new("ScreenGui")
@@ -36,34 +37,31 @@ screenGui.Name = "SprintGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- 1. Sprint Button (Basic Square)
-local sprintButton = Instance.new("TextButton")
-sprintButton.Name = "SprintButton"
-sprintButton.Size = UDim2.new(0, 120, 0, 60)
-sprintButton.Position = UDim2.new(0.85, 0, 0.75, 0) -- Positioned bottom-right area
-sprintButton.BackgroundColor3 = LIGHT_ORANGE
-sprintButton.BorderSizePixel = 0
-sprintButton.AutoButtonColor = true
+-- 1. Main Container Frame (Holds everything together at the bottom right)
+local container = Instance.new("Frame")
+container.Name = "SprintContainer"
+container.Size = UDim2.new(0, 260, 0, 70)
+container.Position = UDim2.new(0.8, 0, 0.8, 0) -- Adjusted position
+container.BackgroundTransparency = 1
+container.Parent = screenGui
 
--- Stylish Rich Text
-sprintButton.RichText = true
-sprintButton.Text = "<b><font face='GothamBlack' color='#FFFFFF' size='22'>SPRINT</font></b>"
-sprintButton.Parent = screenGui
-
--- UI Stroke for a clean edge
-local buttonStroke = Instance.new("UIStroke")
-buttonStroke.Thickness = 2
-buttonStroke.Color = Color3.fromRGB(255, 255, 255)
-buttonStroke.Parent = sprintButton
-
--- 2. Stamina Bar Background (Placed right on top of the button)
+-- 2. Stamina Bar Background (Long bar on the bottom)
 local staminaBg = Instance.new("Frame")
 staminaBg.Name = "StaminaBackground"
-staminaBg.Size = UDim2.new(1, 0, 0, 10) -- Same width as button, 10px high
-staminaBg.Position = UDim2.new(0, 0, 0, -15) -- 15 pixels above the button
-staminaBg.BackgroundColor3 = BACKGROUND_GRAY
+staminaBg.Size = UDim2.new(0, 240, 0, 22)
+staminaBg.Position = UDim2.new(0, 0, 1, -22) -- Snapped to the bottom of the container
+staminaBg.BackgroundColor3 = BG_DARK_ORANGE
 staminaBg.BorderSizePixel = 0
-staminaBg.Parent = sprintButton
+staminaBg.Parent = container
+
+local staminaBgCorner = Instance.new("UICorner")
+staminaBgCorner.CornerRadius = UDim.new(0, 8)
+staminaBgCorner.Parent = staminaBg
+
+local staminaBgStroke = Instance.new("UIStroke")
+staminaBgStroke.Thickness = 4
+staminaBgStroke.Color = BORDER_BROWN
+staminaBgStroke.Parent = staminaBg
 
 -- 3. Actual Stamina Fill Bar
 local staminaFill = Instance.new("Frame")
@@ -73,12 +71,40 @@ staminaFill.BackgroundColor3 = LIGHT_ORANGE
 staminaFill.BorderSizePixel = 0
 staminaFill.Parent = staminaBg
 
+local staminaFillCorner = Instance.new("UICorner")
+staminaFillCorner.CornerRadius = UDim.new(0, 8)
+staminaFillCorner.Parent = staminaFill
+
+-- 4. Sprint Button (Rounded, sitting on top of the bar to the right)
+local sprintButton = Instance.new("TextButton")
+sprintButton.Name = "SprintButton"
+sprintButton.Size = UDim2.new(0, 100, 0, 42)
+sprintButton.Position = UDim2.new(1, -110, 0, 0) -- Top right alignment matching the picture
+sprintButton.BackgroundColor3 = LIGHT_ORANGE
+sprintButton.BorderSizePixel = 0
+sprintButton.AutoButtonColor = true
+sprintButton.ZIndex = 3 -- Layered safely on top
+
+-- Stylish Rich Text matching the font look
+sprintButton.RichText = true
+sprintButton.Text = "<font face='FredokaOne' color='#141414' size='22'>Sprint</font>"
+sprintButton.Parent = container
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 12)
+buttonCorner.Parent = sprintButton
+
+local buttonStroke = Instance.new("UIStroke")
+buttonStroke.Thickness = 4
+buttonStroke.Color = BORDER_BROWN
+buttonStroke.Parent = sprintButton
+
 -- Logic Functions
 local function setSprinting(sprinting)
 	if sprinting and currentStamina > 0 and humanoid.MoveDirection.Magnitude > 0 then
 		isSprinting = true
 		humanoid.WalkSpeed = SPRINT_SPEED
-		sprintButton.BackgroundColor3 = DARK_ORANGE -- Visual feedback when pressed
+		sprintButton.BackgroundColor3 = BG_DARK_ORANGE -- Darkens button slightly when active
 	else
 		isSprinting = false
 		humanoid.WalkSpeed = NORMAL_SPEED
@@ -86,7 +112,7 @@ local function setSprinting(sprinting)
 	end
 end
 
--- Button Inputs (For Click / Mobile Tap)
+-- Button Inputs
 sprintButton.MouseButton1Down:Connect(function()
 	setSprinting(true)
 end)
@@ -95,7 +121,7 @@ sprintButton.MouseButton1Up:Connect(function()
 	setSprinting(false)
 end)
 
--- Keybind Backup (Shift Key for PC players)
+-- Keybind Backup (Left Shift)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.LeftShift then
@@ -111,7 +137,6 @@ end)
 
 -- Core Loop for draining/generating stamina
 RunService.Heartbeat:Connect(function(deltaTime)
-	-- Force stop if player stops moving
 	if isSprinting and humanoid.MoveDirection.Magnitude == 0 then
 		setSprinting(false)
 	end
@@ -125,9 +150,9 @@ RunService.Heartbeat:Connect(function(deltaTime)
 		currentStamina = math.min(MAX_STAMINA, currentStamina + (REGEN_RATE * deltaTime))
 	end
 
-	-- Smoothly update the stamina bar size
+	-- Smoothly update the stamina bar size width
 	local staminaRatio = currentStamina / MAX_STAMINA
-	TweenService:Create(staminaFill, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+	TweenService:Create(staminaFill, TweenInfo.new(0.05, Enum.EasingStyle.Linear), {
 		Size = UDim2.new(staminaRatio, 0, 1, 0)
 	}):Play()
 end)
