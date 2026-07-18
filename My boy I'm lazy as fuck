@@ -153,8 +153,6 @@ local function Rebound()
         end
     end
 
-    -- DESTRUCTION DELETED: The destruction aura tasks have been safely stripped out.
-
     spawn(function()
         while entityPart ~= nil and entity ~= nil do 
             wait(0.5)
@@ -162,107 +160,100 @@ local function Rebound()
             if v.Character ~= nil and v.Character:FindFirstChild("HumanoidRootPart") then
                 if canSeeTarget(v.Character, 50) and not v.Character:GetAttribute("Hiding") then
                     moving:Stop()
-                    local ReboundJs = Instance.new("ScreenGui")
-                    local Static = Instance.new("ImageLabel")
-                    local ReboundImg = Instance.new("ImageLabel")
-                    local JSSIZE = Instance.new("ImageLabel")
- 
-                    ReboundJs.Name = "ReboundJs"
-                    ReboundJs.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
- 
-                    Static.Name = "Static"
-                    Static.Parent = ReboundJs
-                    Static.BackgroundTransparency = 1
-                    Static.Size = UDim2.new(11, 0, 111, 0)
-                    Static.Image = "rbxassetid://236543215"
-                    Static.ImageTransparency = 1
- 
-                    ReboundImg.Name = "Rebound"
-                    ReboundImg.Parent = ReboundJs
-                    ReboundImg.BackgroundTransparency = 1
-                    ReboundImg.Position = UDim2.new(0.4866, 0, 0.4793, 0)
-                    ReboundImg.Size = UDim2.new(0.0267, 0, 0.0387, 0)
                     
-                    -- Dynamic download implementation for custom Jumpscare Decal UI path
-                    local uiDecal = G.LoadGithubImage("https://github.com/brylesantos38-cell/Rebound-decal-image/blob/main/lv_0_20260711194651.png")
-                    ReboundImg.Image = uiDecal or "rbxassetid://0"
- 
-                    JSSIZE.Name = "JSSIZE"
-                    JSSIZE.Parent = ReboundJs
-                    JSSIZE.BackgroundTransparency = 1
-                    JSSIZE.Position = UDim2.new(-0.586, 0, -1.251, 0)
-                    JSSIZE.Size = UDim2.new(2.128, 0, 3.081, 0)
-                    JSSIZE.Visible = false
-                    JSSIZE.Image = uiDecal or "rbxassetid://10914800940"
- 
-                    coroutine.wrap(function()
-                        local script = Static
-                        while true do
-                            script.Image = "rbxassetid://236543215"
-                            task.wait(0.002)
-                            script.Rotation = 0
-                            task.wait(0.002)
-                            script.Rotation = 180
-                            task.wait(0.002)
-                            script.Image = "rbxassetid://236777652"
-                            task.wait(0.002)
-                            script.Rotation = 0
-                            task.wait(0.002)
-                            script.Rotation = 180
-                            task.wait(0.002)
-                        end
-                    end)()
- 
-                    coroutine.wrap(function()
-                        local Plr = game.Players.LocalPlayer
-                        local gui = ReboundJs
-                        local static = gui.Static
-                        local jspos = gui.JSSIZE
+                    -- ============================================================================
+                    -- NEW INTEGRATED JUMPSCARE ENGINE
+                    -- ============================================================================
+                    local Players = game:GetService("Players")
+                    local TweenService = game:GetService("TweenService")
+                    local RunService = game:GetService("RunService")
+                    local SoundService = game:GetService("SoundService")
 
-                        -- Messy Jumpscare Audio: Overlays both requested audio IDs simultaneously
-                        local jsSound1 = Instance.new("Sound")
-                        jsSound1.SoundId = "rbxassetid://109582246349306"
-                        jsSound1.Parent = workspace
-                        jsSound1.Volume = 5
-                        jsSound1:Play()
-                        game.Debris:AddItem(jsSound1, 10)
+                    local LocalPlayer = Players.LocalPlayer
+                    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-                        local jsSound2 = Instance.new("Sound")
-                        jsSound2.SoundId = "rbxassetid://74885373257467"
-                        jsSound2.Parent = workspace
-                        jsSound2.Volume = 6
-                        jsSound2.PlaybackSpeed = 0.95
-                        jsSound2:Play()
-                        game.Debris:AddItem(jsSound2, 10)
- 
-                        game.TweenService:Create(static, TweenInfo.new(0.5), {ImageTransparency = 0.8}):Play()
-                        game.TweenService:Create(gui.Rebound, TweenInfo.new(0.5), {Size = jspos.Size, Position = jspos.Position}):Play()
+                    -- Create structural container
+                    local JumpscareGui = Instance.new("ScreenGui")
+                    JumpscareGui.Name = "SystemJumpscareEngine"
+                    JumpscareGui.IgnoreGuiInset = true
+                    JumpscareGui.DisplayOrder = 999999
+                    JumpscareGui.Parent = PlayerGui
+
+                    -- Dark blue cinematic background canvas frame
+                    local Background = Instance.new("Frame")
+                    Background.Size = UDim2.new(1, 0, 1, 0)
+                    Background.BackgroundColor3 = Color3.fromRGB(5, 10, 25)
+                    Background.BorderSizePixel = 0
+                    Background.Parent = JumpscareGui
+
+                    -- Jumpscare Asset Render Target
+                    local JumpscareImage = Instance.new("ImageLabel")
+                    JumpscareImage.Size = UDim2.new(0.85, 0, 0.85, 0)
+                    JumpscareImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+                    JumpscareImage.AnchorPoint = Vector2.new(0.5, 0.5)
+                    JumpscareImage.BackgroundTransparency = 1
+                    JumpscareImage.Image = "rbxassetid://116381233173787"
+                    JumpscareImage.Parent = Background
+
+                    -- Audio Driver Initialization
+                    local JumpscareSound = Instance.new("Sound")
+                    JumpscareSound.SoundId = "rbxassetid://94785993416953"
+                    JumpscareSound.Volume = 3.5
+                    JumpscareSound.Parent = SoundService
+                    JumpscareSound:Play()
+
+                    -- High-Intensity Shake Loop Mechanics
+                    local shakeIntensity = 45
+                    local shakeConnection
+
+                    shakeConnection = RunService.RenderStepped:Connect(function()
+                        local offsetX = math.random(-shakeIntensity, shakeIntensity)
+                        local offsetY = math.random(-shakeIntensity, shakeIntensity)
+                        JumpscareImage.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
                         
-                        task.spawn(function()
-                            wait(0.3)
-                            local hum = Plr.Character:FindFirstChildWhichIsA("Humanoid")
-                            if hum then hum:TakeDamage(100) end
-                            
-                            game.ReplicatedStorage.GameStats["Player_" .. Plr.Name].Total.DeathCause.Value = "Rebound"
-							local hints = {
-								"You died to the entity designated as Rebound...",
-								"He could trick you by coming through the next doors in the next few seconds!",
-								"Whenever this happens, do not go forward, stay on your desired hiding spot!"
-							}
-							if ReplicatedStorage:FindFirstChild("RemotesFolder") then
-								remotesFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
-			                    firesignal(remotesFolder.DeathHint.OnClientEvent, hints, "Blue")
-							elseif ReplicatedStorage:FindFirstChild("Bricks") then
-								remotesFolder = ReplicatedStorage:FindFirstChild("Bricks")
-			                    firesignal(remotesFolder.DeathHint.OnClientEvent, hints)
-							end
+                        local sizeFluctuation = math.random(-5, 5) / 100
+                        JumpscareImage.Size = UDim2.new(0.85 + sizeFluctuation, 0, 0.85 + sizeFluctuation, 0)
+                    end)
+
+                    -- Damage handling and HUD warning systems
+                    task.spawn(function()
+                        wait(0.3)
+                        local hum = LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                        if hum then hum:TakeDamage(100) end
+                        
+                        game.ReplicatedStorage.GameStats["Player_" .. LocalPlayer.Name].Total.DeathCause.Value = "Rebound"
+                        local hints = {
+                            "You died to the entity designated as Rebound...",
+                            "He could trick you by coming through the next doors in the next few seconds!",
+                            "Whenever this happens, do not go forward, stay on your desired hiding spot!"
+                        }
+                        if ReplicatedStorage:FindFirstChild("RemotesFolder") then
+                            remotesFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
+                            firesignal(remotesFolder.DeathHint.OnClientEvent, hints, "Blue")
+                        elseif ReplicatedStorage:FindFirstChild("Bricks") then
+                            remotesFolder = ReplicatedStorage:FindFirstChild("Bricks")
+                            firesignal(remotesFolder.DeathHint.OnClientEvent, hints)
+                        end
+                    end)
+
+                    -- Dynamic System Cleanup Sequencing
+                    task.delay(1, function()
+                        if shakeConnection then
+                            shakeConnection:Disconnect()
+                        end
+                        
+                        local backgroundTween = TweenService:Create(Background, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+                        local imageTween = TweenService:Create(JumpscareImage, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 1})
+                        
+                        backgroundTween:Play()
+                        imageTween:Play()
+                        
+                        backgroundTween.Completed:Connect(function()
+                            JumpscareGui:Destroy()
+                            JumpscareSound:Destroy()
                         end)
-                        wait(0.5)
-                        game.TweenService:Create(static, TweenInfo.new(1), {ImageTransparency = 1}):Play()
-                        game.TweenService:Create(gui.Rebound, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
-                        wait(1)
-                        gui:Destroy()
-                    end)()
+                    end)
+                    -- ============================================================================
                 end
             end
 
@@ -295,7 +286,6 @@ end
 local function SpawnReb()
     local maxRebounds = math.random(7, 8)
     
-    -- Function to execute warning color screen filter and play arrival cue
     local function playWarningSequence()
         local rebarrival = G.LoadGithubAudio("https://github.com/brylesantos38-cell/REBOUND-REIMAGINED-SOUNDS-/blob/main/REBOUND%20REIMAGINED%20WARNING%20FR%20FR.mp3")
         local arrival = Instance.new("Sound")
@@ -327,14 +317,11 @@ local function SpawnReb()
         camShake:ShakeOnce(10, 3, 0.1, 6, 2, 0.5)
     end
 
-    -- Core initial arrival sequence call
     playWarningSequence()
     pcall(Rebound)
     
-    -- Listens for subsequent door openings to fire early warning sounds and execution loop
     while maxRebounds > 0 do
         game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
-        -- Early sound spawn and filter effects applied instantly upon new door change
         playWarningSequence()
         wait(2)
         pcall(Rebound)
