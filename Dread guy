@@ -1,0 +1,166 @@
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local HumanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local CurrentRooms = game.Workspace.CurrentRooms
+local currentLoadedRoom = game.ReplicatedStorage.GameData.LatestRoom.Value
+local SpawnVariable = CurrentRooms:FindFirstChild(currentLoadedRoom)
+
+-- Updated Model ID
+local Dread = game:GetObjects("rbxassetid://93468862065780")[1]
+Dread.Parent = game.Workspace
+Dread.PrimaryPart = Dread:FindFirstChildWhichIsA("BasePart")
+Dread.PrimaryPart.Anchored = true
+Dread.PrimaryPart.CanCollide = false
+Dread.PrimaryPart.Position = SpawnVariable.Parts.Floor.Position + Vector3.new(0, 6, 0)
+
+-- GitHub Sound Loader Helper
+local function GetGitSound(GithubSnd, SoundName)
+    local url = GithubSnd
+    if not isfile(SoundName .. ".mp3") then
+        writefile(SoundName .. ".mp3", game:HttpGet(url))
+    end
+    local sound = Instance.new("Sound")
+    sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+    return sound
+end
+
+-- Atmosphere & Lighting adjustments (Dark, Distorted Gray, Lights Disabled)
+game.Lighting.Ambient = Color3.fromRGB(20, 20, 20)
+game.Lighting.OutdoorAmbient = Color3.fromRGB(20, 20, 20)
+
+local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection") or Instance.new("ColorCorrectionEffect")
+colorCorrection.Name = "MainColorCorrection"
+colorCorrection.Parent = game.Lighting
+colorCorrection.Saturation = -0.8
+colorCorrection.Contrast = 0.5
+colorCorrection.TintColor = Color3.fromRGB(150, 150, 150)
+
+-- Disable all lights in the current room
+for _, v in pairs(SpawnVariable:GetDescendants()) do
+    if v:IsA("Light") or v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+        v.Enabled = false
+    end
+end
+
+-- Play Slowed Theme Song
+local themeSong = GetGitSound("https://github.com/brylesantos38-cell/Dread/blob/main/Five%20Nights%20At%20Freddy_s%204%20Soundtrack%20-%20Clock%20Chimes.mp3?raw=true", "dread_theme")
+themeSong.Parent = Dread.PrimaryPart
+themeSong.Volume = 3
+themeSong.PlaybackSpeed = 0.65 -- Slowed down
+themeSong.Looped = true
+themeSong:Play()
+
+task.wait(5)
+local debounce = false
+
+local function death()
+    debounce = true
+    
+    -- Lock Camera
+    local camLock = RunService.RenderStepped:Connect(function()
+        local Camera = workspace.CurrentCamera
+        local cameraPosition = Camera.CFrame.Position
+        local Dreade = Dread.PrimaryPart
+        local modelPosition = Dreade:GetPivot().Position
+        Camera.CFrame = CFrame.new(cameraPosition, modelPosition)
+    end)
+
+    -- JUMPSCARE SEQUENCE: Gray out and flashing lights
+    local flashToggle = false
+    local flashConnection = RunService.RenderStepped:Connect(function()
+        flashToggle = not flashToggle
+        colorCorrection.Saturation = -1 -- Completely gray
+        if flashToggle then
+            colorCorrection.Brightness = 0.8
+            colorCorrection.Contrast = 2
+        else
+            colorCorrection.Brightness = -0.5
+            colorCorrection.Contrast = 0
+        end
+    end)
+    
+    -- Stop theme and particle setup
+    themeSong:Stop()
+    for i, v in pairs(Dread:GetDescendants()) do
+        if v:IsA("ParticleEmitter") then
+            v.TimeScale = 0
+        end
+    end
+
+    -- Camera Shake
+    local CameraShaker = require(game.ReplicatedStorage:WaitForChild("CameraShaker"))
+    local camera = game.Workspace.CurrentCamera
+    local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+        camera.CFrame = camera.CFrame * shakeCf
+    end)
+    camShake:Start()
+    camShake:ShakeOnce(90, 90, 90, 90.5, 90, 95)
+    
+    task.wait(1.5) -- Flashing duration before the sound hits
+
+    -- New Distorted Deep Jumpscare Sound
+    local jsSound = Instance.new("Sound")
+    jsSound.SoundId = "rbxassetid://5467064996"
+    jsSound.Parent = workspace
+    jsSound.Volume = 5
+    jsSound.PlaybackSpeed = 0.4 -- Distorted and deep
+    jsSound:Play()
+
+    -- Wait for the jumpscare sound to play out before killing
+    task.wait(3.5)
+
+    -- Cleanup and Kill Player
+    flashConnection:Disconnect()
+    camLock:Disconnect()
+    colorCorrection:Destroy()
+    
+    game.Players.LocalPlayer.Character.Humanoid:TakeDamage(125)
+    
+    if SpawnVariable and SpawnVariable:FindFirstChild("Parts") and SpawnVariable.Parts:FindFirstChild("Floor") then
+        SpawnVariable.Parts.Floor:Destroy()
+    end
+    
+    Debris:AddItem(Dread, 1)
+end
+
+-- Line of Sight / Screen Detection Loop
+task.spawn(function()
+    while task.wait() do
+        if debounce == true then
+            break
+        end
+
+        if Dread and Dread.PrimaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local _, onScreen = workspace.CurrentCamera:WorldToScreenPoint(Dread.PrimaryPart.Position)
+            
+            local origin = Dread.PrimaryPart.Position
+            local direction = player.Character.HumanoidRootPart.Position - origin
+            
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {Dread}
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            
+            local rayResult = game.Workspace:Raycast(origin, direction, raycastParams)
+            
+            if rayResult and (rayResult.Instance:IsDescendantOf(player.Character)) then
+                if onScreen then
+                    death()
+                end
+            end
+        end
+    end
+end)
+
+-- Room Change Deletion Logic
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+if Dread then
+    Dread:Destroy()
+end
